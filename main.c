@@ -89,6 +89,33 @@ void free_creatures(Creature **list, int size) {
     for (int i = 0; i < size; i++) {
         free(list[i]);
     }
+    free(list);
+}
+
+void player_attack(Player *player, Creature *opponent) {
+    printf("\n%s attacked %s for %d damage!\n", player->name, opponent->name, player->attack);
+    opponent->health -= player->attack;
+    printf("%s now has %d health.\n", opponent->name, opponent->health);
+   
+}
+
+void player_heal(Player *player) {
+    int heal = rand() % 6;
+    player->health += heal;
+    printf("\n%s healed for %d health. %s's health is now %d.\n", player->name, heal, player->name, player->health);
+
+}
+
+void creature_turn(Player *player, Creature *opponent) {
+    if (opponent->health > 0) {
+        printf("%s attacked %s for %d damage!\n", opponent->name, player->name, opponent->attack);
+        player->health -= opponent->attack;
+        printf("%s now has %d health.\n", player->name, player->health);
+    }
+    // Creature death
+    else if (opponent->health <= 0) {
+        printf("%s has died.\n", opponent->name);
+    }
 }
 
 // Initiate a single round of combat
@@ -109,20 +136,19 @@ int start_round(Player *player, Creature **creature_list, int num_creatures) {
             player_action = false;
             printf("\nAction: ");
             user_in = getchar();
-            extra_char_buff = getchar();
+            extra_char_buff = getchar();    // Clear buffer of '\n'
             switch (user_in) {
+                // Player attack
                 case 'a':
                     player_action = true;
-                    printf("\n%s attacked %s for %d damage!\n", player->name, opponent->name, player->attack);
-                    opponent->health -= player->attack;
-                    printf("%s now has %d health.\n", opponent->name, opponent->health);
+                    player_attack(player, opponent);
                     break;
+                // Player self-heal
                 case 'h':
                     player_action = true;
-                    int heal = rand() % 6;
-                    player->health += heal;
-                    printf("\n%s healed for %d health. %s's health is now %d.\n", player->name, heal, player->name, player->health);
+                    player_heal(player);
                     break;
+                // User quit
                 case 'q':
                     continue;
                 default:
@@ -133,15 +159,9 @@ int start_round(Player *player, Creature **creature_list, int num_creatures) {
                 extra_char_buff = getchar();
             }
 
-            if (player_action && opponent->health > 0) {
-                // Creature response
-                printf("%s attacked %s for %d damage!\n", opponent->name, player->name, opponent->attack);
-                player->health -= opponent->attack;
-                printf("%s now has %d health.\n", player->name, player->health);
-            }
-            // Creature death
-            else if (opponent->health <= 0) {
-                printf("%s has died.\n", opponent->name);
+            // Creature's turn
+            if (player_action) {
+                creature_turn(player, opponent);
             }
 
             // Player death
@@ -192,9 +212,23 @@ int request_new_round() {
 }
 
 // Main game loop
-int game_loop(Player *player, Creature **creature_list, int num_creatures) {
+int game_loop() {
+    Player *player;
+    Creature **creature_list;
+    int num_creatures;
     int user_state = 0;
     int years = 0;
+
+    // Create player
+    printf("What was your name, oh wretched soul?: ");
+    player = create_player();
+
+    // Specify number of creatures to fight
+    printf("\nWelcome to Hell, %s! Your health is %d and your attack is %d.\nHow many creatures would you like to fight? (999 Max): ", player->name, player->health, player->attack);	
+    num_creatures = get_num_creatures(creature_list);
+
+    // Summon creatures
+    creature_list = random_creature_generator(num_creatures);
 
     while (user_state == 0) {
         user_state = start_round(player, creature_list, num_creatures);
@@ -213,39 +247,26 @@ int game_loop(Player *player, Creature **creature_list, int num_creatures) {
         }
     }
 
+    // Free remaining memory
+    free(player->name);
+    free(player);
+
     return user_state;
 }
 
 int main(int argc, char **argv) {
-    Player *player;
-    Creature **creature_list;
-    int num_creatures;
     int user_state;
 
     // Set random seed
     srand(time(0));
 
-    // Create player
-    printf("What was your name, oh wretched soul?: ");
-    player = create_player();
-
-    // Specify number of creatures to fight
-    printf("\nWelcome to Hell, %s! Your health is %d and your attack is %d.\nHow many creatures would you like to fight? (999 Max): ", player->name, player->health, player->attack);	
-    num_creatures = get_num_creatures(creature_list);
-
-    // Summon creatures
-    creature_list = random_creature_generator(num_creatures);
-
     // Multi-round loop
-    user_state = game_loop(player, creature_list, num_creatures);
+    user_state = game_loop();
 
     // Player death message
     if (user_state == 1) {
         printf("\nIt would appear that you have exceeded your means and sought too great of a reward. Your eternal punishment in Hell begins now!\n");
     }
-
-    // Free allocated memory
-    free(player);
 
     return 0;
 }
