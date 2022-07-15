@@ -4,8 +4,13 @@
 #include <stdbool.h>
 #include <time.h>
 
-enum creature_type {God, Human, Cat, Rat, Bug};
-int num_creature_types = 5;
+enum creature_type {God, Human, Demon, Cat, Rat, Bug, NUM_CREATURE_TYPES}; 
+char *GODS[] = {"Zeus", "Hermes", "Athena", "Ares", "Hades", "Aphrodite", "Poseidon", "Hephaestus", "Hera", "Demeter", "Apollo", "Artemis", "Dionysus"};
+char *HUMANS[] = {"Alexander the Great", "Caesar", "Virgil", "Plato", "Saint Peter", "The Prophet Muhammad"};
+char *DEMONS[] = {"Lucifer", "Beelzebub", "Sathanas", "Abadon", "Mammon", "Belphegor", "Asmodeus", "Mephistopheles"};
+char *CATS[] = {"Monkey", "Ollie", "Junie", "Dude", "Milky", "Joey"};
+char *RATS[] = {"Reepicheep", "Templeton", "Speedy Gonzales", "Splinter", "Nigel Ratburn", "Nicodemus", "Mrs. Brisby"};
+char *BUGS[] = {"Human Centipede", "Flik", "Charlotte", "Miss Spider", "Arachne", "Jiminy Cricket", "Zorak"};
 
 typedef struct Player {
     char *name;
@@ -15,6 +20,7 @@ typedef struct Player {
 
 typedef struct Creature {
     char *name;
+    char *species;
     enum creature_type type;
     int health;
     int attack;
@@ -26,9 +32,50 @@ Creature **random_creature_generator(int num) {
     for (int i = 0; i < num; i++) {
         Creature *creature = malloc(sizeof(Creature));
         creature->name = "Rando";
-        creature->type = rand() % num_creature_types;
-        creature->health = rand() % 26;
-        creature->attack = rand() % 6;
+        creature->type = rand() % NUM_CREATURE_TYPES;
+
+        switch (creature->type) {
+            case God:
+                creature->name = GODS[rand() % (sizeof(GODS) / sizeof(char*))];
+                creature->species = "God";
+                creature->health = rand() % 101;
+                creature->attack = rand() % 51;
+                break;
+            case Human:
+                creature->name = HUMANS[rand() % (sizeof(HUMANS) / sizeof(char*))];
+                creature->species = "Human";
+                creature->health = rand() % 101;
+                creature->attack = rand() % 26;
+                break;
+            case Demon:
+                creature->name = DEMONS[rand() % (sizeof(DEMONS) / sizeof(char*))];
+                creature->species = "Demon";
+                creature->health = rand() % 51;
+                creature->attack = rand() % 41;
+                break;
+            case Cat:
+                creature->name = CATS[rand() % (sizeof(CATS) / sizeof(char*))];
+                creature->species = "Cat";
+                creature->health = rand() % 26;
+                creature->attack = rand() % 16;
+                break;
+            case Rat:
+                creature->name = RATS[rand() % (sizeof(RATS) / sizeof(char*))];
+                creature->species = "Rat";
+                creature->health = rand() % 16;
+                creature->attack = rand() % 11;
+                break;
+            case Bug:
+                creature->name = BUGS[rand() % (sizeof(BUGS) / sizeof(char*))];
+                creature->species = "Bug";
+                creature->health = rand() % 11;
+                creature->attack = rand() % 6;
+                break;
+            default:
+                creature->health = rand() % 26;
+                creature->attack = rand() % 6;
+        }
+
         creature_list[i] = creature;
 	}
 	
@@ -92,6 +139,7 @@ void free_creatures(Creature **list, int size) {
     free(list);
 }
 
+// Handle player attacks
 void player_attack(Player *player, Creature *opponent) {
     printf("\n%s attacked %s for %d damage!\n", player->name, opponent->name, player->attack);
     opponent->health -= player->attack;
@@ -99,13 +147,47 @@ void player_attack(Player *player, Creature *opponent) {
    
 }
 
+// Handle player healing
 void player_heal(Player *player) {
-    int heal = rand() % 6;
-    player->health += heal;
-    printf("\n%s healed for %d health. %s's health is now %d.\n", player->name, heal, player->name, player->health);
+    int heal = (rand() % 17) - 1;
+    int damage;
 
+    if (heal > 0) {
+        player->health += heal;
+        printf("\n%s healed for %d health. %s's health is now %d.\n", player->name, heal, player->name, player->health);
+    }
+    else if (heal == 0) {
+        printf("Healing failed! No health gained.\n");
+    }
+    else {
+        // Do self-damage equivalent to 10% - 50% of present health
+        damage = (rand() % 9) + 2;
+        damage = player->health / damage;
+        if (damage == 0) {
+            damage = 1;
+        }
+        player->health -= damage;
+        printf("Critical healing fail! %s sustained %d self-damage, and now has %d health.\n", player->name, damage, player->health);
+    }
 }
 
+// Handle creature deaths
+void creature_death(Player *player, Creature *opponent) {
+    if (opponent->health <= -5 && opponent->health > -10) {
+        printf("%s has been beaten into a bloody pulp.\n", opponent->name);
+    }
+    else if (opponent->health <= -10 && opponent->health > -15) {
+        printf("%s is barely recognizable.\n", opponent->name);
+    }
+    else if (opponent->health <= -15) {
+        player->health -= 5;
+        printf("%s was atomized by %s's deadly blow. The explosion dealt 5 damage to %s, who now has %d health.\n", opponent->name, player->name, player->name, player->health);
+    }
+    
+    printf("%s has died.\n", opponent->name);
+}
+
+// Handle creature turns
 void creature_turn(Player *player, Creature *opponent) {
     if (opponent->health > 0) {
         printf("%s attacked %s for %d damage!\n", opponent->name, player->name, opponent->attack);
@@ -114,7 +196,8 @@ void creature_turn(Player *player, Creature *opponent) {
     }
     // Creature death
     else if (opponent->health <= 0) {
-        printf("%s has died.\n", opponent->name);
+        //printf("%s has died.\n", opponent->name);
+        creature_death(player, opponent);
     }
 }
 
@@ -128,13 +211,13 @@ int start_round(Player *player, Creature **creature_list, int num_creatures) {
     // Loop over each creature in the list
     for (int i = 0; i < num_creatures; i++) {
         opponent = creature_list[i];
-        printf("\nOpponent: %s\nType: %d\nHealth: %d\nAttack: %d\n", opponent->name, opponent->type, opponent->health, opponent->attack);
+        printf("\nOpponent: %s\nSpecies: %s\nHealth: %d\nAttack: %d\n", opponent->name, opponent->species, opponent->health, opponent->attack);
 
         // Combat loop
         while (player->health > 0 && opponent->health > 0 && user_in != 'q') {
             // Player action
             player_action = false;
-            printf("\nAction: ");
+            printf("\nAction ('a': Attack, 'h': Heal, 'q': Quit): ");
             user_in = getchar();
             extra_char_buff = getchar();    // Clear buffer of '\n'
             switch (user_in) {
